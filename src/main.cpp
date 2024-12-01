@@ -34,19 +34,19 @@ int middleBlocky = blockSize * (numberOfBlocks / 2);
 int snakeLength = 3;
 deque<pair<int, int>> snake = {{middleBlockx, middleBlocky}, {middleBlockx, middleBlocky}, {middleBlockx, middleBlocky}};
 
-pair<int, int> direction({-1, 0});
-bool allowDirection=true;
-queue<pair<int, int>> directionBuffer({direction});
+bool useOfBuffer = false;
+bool allowNextMove = true;
 
-int nextDirectionx = direction.first;
-int nextDirectiony = direction.second;
+int nextDirectionx = -1;
+int nextDirectiony = 0;
+queue<pair<int, int>> directionBuffer({{nextDirectionx, nextDirectiony}});
 
 int foodX = (GetRandomValue(leftBorder, rightBorder) / blockSize) * blockSize;
 int foodY = (GetRandomValue(topBorder, bottomBorder) / blockSize) * blockSize;
 
-const Color color1 = {20, 160, 133, 255};
-const Color color2 = {15, 100, 100, 255};
-const Color foodColor = {0, 0, 0, 255};
+Color green = {173, 204, 96, 255};
+Color darkGreen = {43, 51, 24, 255};
+const Color foodColor = darkGreen;
 
 bool started = false;
 bool gameover = false;
@@ -58,16 +58,17 @@ float snakeSpeedOpts[4] = {0.2, 0.1, 0.05, 0.01};
 int speedOpt = 0;
 float snakeSpeed = snakeSpeedOpts[speedOpt];
 
-
 int mainMenuOpt = 0;
 
 void updateSnake()
 {
     snake.pop_front();
-    nextDirectionx = directionBuffer.front().first;
-    nextDirectiony = directionBuffer.front().second;
-    if (directionBuffer.size() > 1)
+    if (useOfBuffer && !directionBuffer.empty())
+    {
+        nextDirectionx = directionBuffer.front().first;
+        nextDirectiony = directionBuffer.front().second;
         directionBuffer.pop();
+    }
 
     int snakeFrontx = snake.back().first + (nextDirectionx * blockSize);
     int snakeFronty = snake.back().second + (nextDirectiony * blockSize);
@@ -200,12 +201,33 @@ void resetGame()
     score = 0;
 }
 
+void updateDirectionBuffer(pair<int, int> newDirecton)
+{
+    int lastDirectionx;
+    int lastDirectiony;
+
+    lastDirectionx = directionBuffer.back().first;
+    lastDirectiony = directionBuffer.back().second;
+
+    if (lastDirectionx != newDirecton.first && lastDirectiony != newDirecton.second)
+    {
+        directionBuffer.push(newDirecton);
+    }
+}
+
 void updateDirection(pair<int, int> newDirecton)
 {
-    if (direction.first != newDirecton.first && direction.second != newDirecton.second)
+    if (useOfBuffer)
     {
-        direction = newDirecton;
-        directionBuffer.push(direction);
+        updateDirectionBuffer(newDirecton);
+        return;
+    }
+
+    if (allowNextMove && (nextDirectionx != newDirecton.first && nextDirectiony != newDirecton.second))
+    {
+        nextDirectionx = newDirecton.first;
+        nextDirectiony = newDirecton.second;
+        allowNextMove = false;
     }
 }
 
@@ -318,19 +340,19 @@ void update()
     }
     if (gameUpdate.checkInterval(snakeSpeed))
     {
+        if (started && (checkSelfCollision() || CheckWallCollision()))
+        {
+            deathPoint = snake.back();
+            dead = true;
+            return;
+        }
+        if (checkFoodCollision())
+        {
+            updateSnakeLength();
+            updateFood();
+        }
         updateSnake();
-    }
-
-    if (started && (checkSelfCollision() || CheckWallCollision()))
-    {
-        deathPoint = snake.back();
-        dead = true;
-    }
-
-    if (checkFoodCollision())
-    {
-        updateSnakeLength();
-        updateFood();
+        allowNextMove = true;
     }
 }
 
@@ -345,25 +367,25 @@ void DrawSnake()
 
 void DrawFood()
 {
-    DrawRectangle(foodX, foodY, blockSize, blockSize, color2);
+    DrawRectangle(foodX, foodY, blockSize, blockSize, darkGreen);
 }
 
 void DrawBorder()
 {
     Rectangle innerRect = {borderx, bordery, borderWidth, borderHeight};
-    DrawRectangleLinesEx(innerRect, borderSize, color2);
+    DrawRectangleLinesEx(innerRect, borderSize, darkGreen);
 }
 
 void DrawScore()
 {
-    DrawText(TextFormat("%i", score), leftBorder, bottomBorder + borderSize + blockSize, blockSize, color2);
+    DrawText(TextFormat("%i", score), leftBorder, bottomBorder + borderSize + blockSize, blockSize, darkGreen);
 }
 
 void DrawTitle()
 {
     int fontSize = blockSize;
     int aboveBorder = topBorder - borderSize - fontSize;
-    DrawText("Retro Snake", leftBorder, aboveBorder, fontSize, color2);
+    DrawText("Retro Snake", leftBorder, aboveBorder, fontSize, darkGreen);
 }
 
 void DrawIntro()
@@ -376,7 +398,7 @@ void DrawIntro()
     float x = (windowWidth / 2) - (textSize / 2);
     float y = (windowHeight / 2) - (fontSize / 2);
 
-    DrawText(&text[0], x, y, fontSize, color2);
+    DrawText(&text[0], x, y, fontSize, darkGreen);
 
     fontSize = blockSize * 2;
     text = "start";
@@ -385,7 +407,7 @@ void DrawIntro()
     x = (windowWidth / 2) - (textSize / 2);
     y = (windowHeight / 2) - (fontSize / 2) + blockSize * (yBlockGap * 2);
 
-    DrawText(&text[0], x, y, fontSize, color2);
+    DrawText(&text[0], x, y, fontSize, darkGreen);
 
     text = "wall  : ";
     text += (wallCollision ? "on" : "off");
@@ -395,7 +417,7 @@ void DrawIntro()
     x = (windowWidth / 2) - (textSize / 2);
     y = (windowHeight / 2) - (fontSize / 2) + blockSize * (yBlockGap * 3);
 
-    DrawText(&text[0], x, y, fontSize, color2);
+    DrawText(&text[0], x, y, fontSize, darkGreen);
 
     text = "speed : " + to_string(speedOpt + 1);
     textSize = MeasureText(&text[0], fontSize);
@@ -403,7 +425,7 @@ void DrawIntro()
     x = (windowWidth / 2) - (textSize / 2);
     y = (windowHeight / 2) - (fontSize / 2) + blockSize * (yBlockGap * 4);
 
-    DrawText(&text[0], x, y, fontSize, color2);
+    DrawText(&text[0], x, y, fontSize, darkGreen);
 
     const int bothStrSize = textSize;
     text = ">  ";
@@ -412,7 +434,7 @@ void DrawIntro()
     x = (windowWidth / 2) - (bothStrSize / 2) - textSize;
     y = (windowHeight / 2) - (fontSize / 2) + blockSize * (yBlockGap * (mainMenuOpt + yBlockGap));
 
-    DrawText(&text[0], x, y, fontSize, color2);
+    DrawText(&text[0], x, y, fontSize, darkGreen);
 }
 
 void DrawGameOver()
@@ -425,12 +447,12 @@ void DrawGameOver()
     float x = (windowWidth / 2) - (textSize / 2);
     float y = (windowHeight / 2) - (fontSize / 2);
 
-    DrawText(&text[0], x, y, fontSize, color2);
+    DrawText(&text[0], x, y, fontSize, darkGreen);
 }
 
 void draw()
 {
-    ClearBackground(color1);
+    ClearBackground(green);
 
     if (gameover)
     {
@@ -449,11 +471,6 @@ void draw()
         DrawSnake();
         DrawBorder();
         DrawScore();
-
-        if (checkSelfCollision())
-        {
-            DrawRectangle(deathPoint.first, deathPoint.second, blockSize, 10, RED);
-        }
     }
 }
 
