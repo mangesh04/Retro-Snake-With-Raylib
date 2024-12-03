@@ -363,6 +363,10 @@ void DrawSnake()
     {
         DrawRectangle(snake[i].first + DrawSkip, snake[i].second + DrawSkip, blockSize - DrawSkip, blockSize - DrawSkip, foodColor);
     }
+    int eyeSize = 20 * blockSize / 100;
+    int eyex = blockSize / 4;
+    int eyey = blockSize / 4;
+    DrawRectangle(snake.back().first + DrawSkip + eyex, snake.back().second + DrawSkip + eyey, eyeSize, eyeSize, green);
 }
 
 void DrawFood()
@@ -464,6 +468,7 @@ void draw()
     {
         DrawIntro();
     }
+
     if (started)
     {
         DrawTitle();
