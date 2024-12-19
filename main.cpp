@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 #include <queue>
+#include "listener.h"
+
 using namespace std;
 
 Sound eatSound;
@@ -44,8 +46,10 @@ queue<pair<int, int>> directionBuffer({{nextDirectionx, nextDirectiony}});
 int foodX = (GetRandomValue(leftBorder, rightBorder) / blockSize) * blockSize;
 int foodY = (GetRandomValue(topBorder, bottomBorder) / blockSize) * blockSize;
 
-Color green = {173, 204, 96, 255};
-Color darkGreen = {43, 51, 24, 255};
+// Color green = {173, 204, 96, 255};
+// Color darkGreen = {43, 51, 24, 255};
+Color green = BLACK;
+Color darkGreen = WHITE;
 const Color foodColor = darkGreen;
 
 bool started = false;
@@ -291,7 +295,11 @@ void mainMenu()
     }
 }
 bool dead = false;
+void checkMiniMizedKey()
+{
 
+    MinimizeWindow();
+}
 void update()
 {
     if (dead)
@@ -453,7 +461,16 @@ void DrawGameOver()
 
     DrawText(&text[0], x, y, fontSize, darkGreen);
 }
+void DrawFps()
+{
 
+    string text = "FPS: " + to_string(GetFPS());
+    int textLength = MeasureText(&text[0], blockSize);
+    int x = rightBorder - textLength;
+    int y = bottomBorder + borderSize + blockSize;
+    // DrawText(&text[0], x, y, blockSize, darkGreen);
+    DrawFPS(x, y);
+}
 void draw()
 {
     ClearBackground(green);
@@ -477,32 +494,74 @@ void draw()
         DrawBorder();
         DrawScore();
     }
+    DrawFps();
 }
 
-int main()
+void initilize_window()
 {
 
-    InitWindow(windowWidth, windowHeight, "My first RAYLIB program!");
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED); // Frameless
+    InitWindow(windowWidth, windowHeight, "Retro Snake");
+
     SetTargetFPS(60);
 
+    Image icon = LoadImage("snake.png");
+    SetWindowIcon(icon);
+    UnloadImage(icon);
     InitAudioDevice();
 
     eatSound = LoadSound("Sounds/Sounds_eat.mp3");
     wallSound = LoadSound("Sounds/Sounds_wall.mp3");
-
-    while (!WindowShouldClose())
-    {
-        BeginDrawing();
-
-        update();
-        draw();
-
-        EndDrawing();
-    }
+}
+void close_window()
+{
 
     UnloadSound(eatSound);
     UnloadSound(wallSound);
     CloseAudioDevice();
 
     CloseWindow();
+}
+void run()
+{
+
+    int lastMousePosX = 0;
+    int lastMousePosY = 0;
+
+    while (!WindowShouldClose())
+    {
+        int mousePosX = GetMouseX();
+        int mousePosY = GetMouseY();
+        int mouseDeltaX = mousePosX - lastMousePosX;
+        int mouseDeltaY = mousePosY - lastMousePosY;
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+        {
+            SetWindowPosition(GetWindowPosition().x + mouseDeltaX * 0.5, GetWindowPosition().y + mouseDeltaY * 0.5);
+        }
+        else
+        {
+            lastMousePosX = mousePosX;
+            lastMousePosY = mousePosY;
+        }
+        if (!IsWindowFocused())
+        {
+            MinimizeWindow();
+        }
+        BeginDrawing();
+        update();
+        draw();
+        EndDrawing();
+    }
+}
+
+int main()
+{
+    initilize_window();
+    extra_features();
+    SetRoundedWindow(40);
+    installHook();
+    run();
+    uninstallHook();
+    close_window();
+    return 0;
 }

@@ -14,7 +14,7 @@
                 "args": [
                     "RAYLIB_PATH=C:/raylib/raylib",
                     "PROJECT_NAME=${fileBasenameNoExtension}",
-                    "OBJS=src/*.cpp",
+                    "OBJS=*.cpp",
                     "BUILD_MODE=DEBUG"
                 ]
             },
