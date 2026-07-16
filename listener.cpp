@@ -11,6 +11,8 @@ bool isMin()
     return IsIconic(hwnd);
 }
 
+
+
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 
