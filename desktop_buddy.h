@@ -19,6 +19,12 @@ inline const Color COL_GREEN = { 135, 241,  97, 255 };  // #87f161
 inline const Color COL_DIM   = {  80,  80,  80, 255 };
 inline const Color COL_BG    = {   8,   8,   8, 225 };  // panel background
 
+// Phosphor-green tint applied directly to the buddy sprite. The buddy now
+// bypasses the whole-window CRT composite pass entirely (see run() in
+// main.cpp), so it no longer inherits that pass's phosphorColor tint —
+// this replaces it, applied right at the DrawTexturePro call instead.
+inline const Color BUDDY_TINT = { 64, 255, 89, 255 };
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -32,24 +38,75 @@ inline int pending_app_index = 0;
 // Textures
 // ---------------------------------------------------------------------------
 
-inline Texture2D standing_texture;
+inline Texture2D idle_texture;   // roboIdle.png  — slow breathing/idle loop
+inline Texture2D blink_texture;  // roboBlink.png — quick blink, played 2x in a row
 inline Texture2D attacking_texture;
 
+/// Shared dot-matrix terminal font (VT323), used by every screen instead of
+/// raylib's default font. Loaded once in main.cpp, used everywhere via
+/// DrawTextEx/MeasureTextEx.
+inline Font retroFont = { 0 };
+
+/// Thin wrappers so call sites read just like the old DrawText/MeasureText
+/// but always go through the shared retro font.
+inline int RMeasureText(const char* text, int fontSize)
+{
+    return (int)MeasureTextEx(retroFont, text, (float)fontSize, 1.0f).x;
+}
+
+inline void RDrawText(const char* text, int x, int y, int fontSize, Color color)
+{
+    DrawTextEx(retroFont, text, { (float)x, (float)y }, (float)fontSize, 1.0f, color);
+}
+
 // ---------------------------------------------------------------------------
-// Idle sprite sheet
+// Idle sprite sheet (roboIdle.png) — 3 frames, 64x64, single horizontal row
 // ---------------------------------------------------------------------------
 
-inline float standing_sprite_x = 80.0f;
-inline float standing_sprite_y = 200.0f;
-inline float standing_sprite_w = 200.0f;
-inline float standing_sprite_h = 250.0f;
-inline float standing_frame_w  = 275.0f;
-inline float standing_frame_h  = 330.0f;
-inline float standing_gap_x    = 20.0f;
-inline float standing_gap_y    = 45.0f;
+constexpr int   IDLE_FRAME_SIZE  = 64;
+constexpr int   IDLE_TOTAL_FRAMES = 3;
+constexpr float IDLE_FRAME_TIME  = 0.25f;   // slow
 
-inline Rectangle standing_src = { standing_sprite_x, standing_sprite_y,
-                                   standing_sprite_w, standing_sprite_h };
+/// How much bigger than the native 64x64 sprite the buddy window is drawn.
+constexpr float BUDDY_DISPLAY_SCALE = 2.5f;
+
+inline Rectangle idle_src = { 0.0f, 0.0f, (float)IDLE_FRAME_SIZE, (float)IDLE_FRAME_SIZE };
+
+// ---------------------------------------------------------------------------
+// Blink sprite sheet (roboBlink.png) — 7 frames, 64x64, single horizontal row
+// ---------------------------------------------------------------------------
+
+constexpr int   BLINK_FRAME_SIZE   = 64;
+constexpr int   BLINK_TOTAL_FRAMES = 7;
+constexpr float BLINK_FRAME_TIME   = 0.045f;  // faster than idle
+constexpr int   BLINK_REPEAT_COUNT = 2;       // play the blink twice in a row
+
+// Random gap (seconds) between blink cycles, picked fresh each time
+constexpr int BLINK_COOLDOWN_MIN = 3;
+constexpr int BLINK_COOLDOWN_MAX = 6;
+
+inline Rectangle blink_src = { 0.0f, 0.0f, (float)BLINK_FRAME_SIZE, (float)BLINK_FRAME_SIZE };
+
+inline bool  buddy_blinking      = false;
+inline int   blink_cycles_done   = 0;
+inline float blink_cooldown_timer = 3.0f;
+inline Interval blinkAnimInterval;
+
+// ---------------------------------------------------------------------------
+// Retro CRT-style shader (applied to the buddy sprite only)
+// ---------------------------------------------------------------------------
+
+inline Shader retroShader;
+inline int    retroShader_timeLoc;          // continuous real-time clock, decoupled from sprite frame timers
+inline int    retroShader_frameBoundsLoc;   // (u0,v0,u1,v1) of the current sprite frame within its sheet
+
+// ---------------------------------------------------------------------------
+// Focus outline glow — traces the buddy sprite's silhouette when clicked
+// ---------------------------------------------------------------------------
+
+inline Shader outlineShader;
+inline int    outlineShader_frameBoundsLoc; // same frame-bounds convention as retroShader
+inline int    outlineShader_colorLoc;       // vec4(r,g,b,a) — a is the current pulse intensity
 
 // ---------------------------------------------------------------------------
 // Attack sprite sheet
@@ -128,3 +185,5 @@ void initDesktopBuddy();
 void updateDesktopBuddy();
 void drawDesktopBuddy();
 void startBuddyReturn();
+void applyPendingBuddyResize();
+void requestBuddyWindowResize(int x, int y, int w, int h);

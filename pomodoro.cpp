@@ -1,12 +1,12 @@
 #include "pomodoro.h"
-#include "desktop_buddy.h"   // for pending_app_index, COL_BLUE, COL_GREEN
+#include "desktop_buddy.h" // for pending_app_index, COL_BLUE, COL_GREEN
 #include <string>
 #include <vector>
 #include <algorithm>
 
 using namespace std;
 
-extern Sound eatSound;   // declared in snake.h / utils.h, loaded in main.cpp
+extern Sound eatSound; // declared in snake.h / utils.h, loaded in main.cpp
 
 // ---------------------------------------------------------------------------
 // Reset
@@ -14,10 +14,10 @@ extern Sound eatSound;   // declared in snake.h / utils.h, loaded in main.cpp
 
 void resetPomodoro()
 {
-    pomPhase        = PomodoroPhase::WORK;
-    pomTimeLeft     = POMODORO_WORK_MINUTES * 60.0f;
-    pomRunning      = false;
-    pomWasStarted   = false;
+    pomPhase = PomodoroPhase::WORK;
+    pomTimeLeft = POMODORO_WORK_MINUTES * 60.0f;
+    pomRunning = false;
+    pomWasStarted = false;
     pomFloatingTimer = false;
 }
 
@@ -27,7 +27,8 @@ void resetPomodoro()
 
 void updatePomodoroTime()
 {
-    if (!pomRunning) return;
+    if (!pomRunning)
+        return;
 
     pomTimeLeft -= GetFrameTime();
 
@@ -36,15 +37,15 @@ void updatePomodoroTime()
         if (pomPhase == PomodoroPhase::WORK)
         {
             pomSessions++;
-            pomPhase    = PomodoroPhase::BREAK;
+            pomPhase = PomodoroPhase::BREAK;
             pomTimeLeft = POMODORO_BREAK_MINUTES * 60.0f;
         }
         else
         {
-            pomPhase    = PomodoroPhase::WORK;
+            pomPhase = PomodoroPhase::WORK;
             pomTimeLeft = POMODORO_WORK_MINUTES * 60.0f;
         }
-        PlaySound(eatSound);   // audible cue on every phase flip
+        PlaySound(eatSound); // audible cue on every phase flip
         // Keep running — phases transition automatically
     }
 }
@@ -74,8 +75,8 @@ void updatePomodoro()
     // DRAG — move the Pomodoro window (absolute screen coords, no jitter)
     // -----------------------------------------------------------------------
 
-    static int  pomPressAbsX  = 0, pomPressAbsY = 0;
-    static int  pomLastAbsX   = 0, pomLastAbsY  = 0;
+    static int pomPressAbsX = 0, pomPressAbsY = 0;
+    static int pomLastAbsX = 0, pomLastAbsY = 0;
     static bool pomPressMoved = false;
 
     Vector2 pomWinPos = GetWindowPosition();
@@ -84,10 +85,10 @@ void updatePomodoro()
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
-        pomPressAbsX  = absX;
-        pomPressAbsY  = absY;
-        pomLastAbsX   = absX;
-        pomLastAbsY   = absY;
+        pomPressAbsX = absX;
+        pomPressAbsY = absY;
+        pomLastAbsX = absX;
+        pomLastAbsY = absY;
         pomPressMoved = false;
     }
 
@@ -102,7 +103,7 @@ void updatePomodoro()
             int deltaY = absY - pomLastAbsY;
             Vector2 pos = GetWindowPosition();
             SetWindowPosition((int)pos.x + deltaX, (int)pos.y + deltaY);
-            Vector2 newPos  = GetWindowPosition();
+            Vector2 newPos = GetWindowPosition();
             window_center_x = newPos.x + current_win_w / 2.0f;
             window_center_y = newPos.y + current_win_h / 2.0f;
         }
@@ -124,9 +125,9 @@ void updatePomodoro()
             pomSettingsField = (pomSettingsField + 1) % 2;
 
         // Left/Right to decrement/increment current field
-        int& editVal = (pomSettingsField == 0) ? pomEditWork : pomEditBreak;
-        int  minVal  = (pomSettingsField == 0) ? 1 : 1;
-        int  maxVal  = (pomSettingsField == 0) ? 99 : 60;
+        int &editVal = (pomSettingsField == 0) ? pomEditWork : pomEditBreak;
+        int minVal = (pomSettingsField == 0) ? 1 : 1;
+        int maxVal = (pomSettingsField == 0) ? 99 : 60;
 
         if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_UP))
             editVal = min(maxVal, editVal + 1);
@@ -136,7 +137,7 @@ void updatePomodoro()
         // Enter — apply and close
         if (IsKeyPressed(KEY_ENTER))
         {
-            POMODORO_WORK_MINUTES  = pomEditWork;
+            POMODORO_WORK_MINUTES = pomEditWork;
             POMODORO_BREAK_MINUTES = pomEditBreak;
             resetPomodoro();
             pomSettingsOpen = false;
@@ -145,11 +146,11 @@ void updatePomodoro()
         // ESC — discard and close settings, stay in Pomodoro
         if (IsKeyPressed(KEY_ESCAPE))
         {
-            pomSettingsOpen  = false;
-            pomEscConsumed   = true;   // tell main.cpp not to exit to buddy
+            pomSettingsOpen = false;
+            pomEscConsumed = true; // tell main.cpp not to exit to buddy
         }
 
-        return;   // Eat all other input while settings is open
+        return; // Eat all other input while settings is open
     }
 
     // -----------------------------------------------------------------------
@@ -159,10 +160,10 @@ void updatePomodoro()
     // S — open settings
     if (IsKeyPressed(KEY_S))
     {
-        pomEditWork     = POMODORO_WORK_MINUTES;
-        pomEditBreak    = POMODORO_BREAK_MINUTES;
+        pomEditWork = POMODORO_WORK_MINUTES;
+        pomEditBreak = POMODORO_BREAK_MINUTES;
         pomSettingsField = 0;
-        pomSettingsOpen  = true;
+        pomSettingsOpen = true;
         return;
     }
 
@@ -170,22 +171,26 @@ void updatePomodoro()
     if (IsKeyPressed(KEY_SPACE))
     {
         pomRunning = !pomRunning;
-        if (pomRunning) pomWasStarted = true;
+        if (pomRunning)
+            pomWasStarted = true;
     }
 
     // R — reset
-    if (IsKeyPressed(KEY_R)) resetPomodoro();
+    if (IsKeyPressed(KEY_R))
+        resetPomodoro();
 
     // App list navigation
     vector<int> launchable = getLaunchableApps();
-    if (launchable.empty()) return;
+    if (launchable.empty())
+        return;
 
     // Make sure pom_selected_app is valid
-    auto it  = find(launchable.begin(), launchable.end(), pom_selected_app);
-    int  pos = (it != launchable.end()) ? (int)(it - launchable.begin()) : 0;
-    if (it == launchable.end()) pom_selected_app = launchable[0];
+    auto it = find(launchable.begin(), launchable.end(), pom_selected_app);
+    int pos = (it != launchable.end()) ? (int)(it - launchable.begin()) : 0;
+    if (it == launchable.end())
+        pom_selected_app = launchable[0];
 
-    if (IsKeyPressed(KEY_UP)   && pos > 0)
+    if (IsKeyPressed(KEY_UP) && pos > 0)
         pom_selected_app = launchable[pos - 1];
 
     if (IsKeyPressed(KEY_DOWN) && pos < (int)launchable.size() - 1)
@@ -195,7 +200,8 @@ void updatePomodoro()
     {
         // Launch selected app — window is already full size, no transition needed
         // If timer was running, keep it going in background
-        if (pomWasStarted) pomFloatingTimer = true;
+        if (pomWasStarted)
+            pomFloatingTimer = true;
         pending_app_index = pom_selected_app;
     }
 }
@@ -208,177 +214,188 @@ void drawPomodoro()
 {
     ClearBackground(BLANK);
 
-    // Dark panel — solid enough to read against any desktop background
-    DrawRectangle(0, 0, windowWidth, windowHeight, { 6, 6, 10, 230 });
+    // Dim green tone for this screen only — keeps the whole panel monochrome
+    // to match the phosphor CRT look, without touching the shared COL_DIM
+    // used elsewhere (buddy, menu).
+    static const Color DIM_GREEN = {25, 90, 20, 255};
 
-    // Thin blue accent line along the top edge
-    DrawRectangle(0, 0, windowWidth, 2, COL_BLUE);
+    // Dark panel — fully opaque so the window reads as a solid device,
+    // no desktop bleeding through even at the edges/corners
+    DrawRectangle(0, 0, windowWidth, windowHeight, {6, 6, 10, 255});
+
+    // Thin green accent line along the top edge
+    DrawRectangle(0, 0, windowWidth, 2, COL_GREEN);
 
     bool isWork = (pomPhase == PomodoroPhase::WORK);
 
     // ---- PHASE LABEL -------------------------------------------------------
 
-    const char* phaseLabel = isWork ? "WORK" : "BREAK";
-    int         phaseSz    = blockSize + 4;
-    int         phaseW     = MeasureText(phaseLabel, phaseSz);
-    int         phaseX     = (windowWidth - phaseW) / 2;
-    int         phaseY     = 28;
+    const char *phaseLabel = isWork ? ":: WORK ::" : ":: BREAK ::";
+    int phaseSz = blockSize + 6;
+    int phaseW = RMeasureText(phaseLabel, phaseSz);
+    int phaseX = (windowWidth - phaseW) / 2;
+    int phaseY = 30;
 
-    DrawText(phaseLabel, phaseX, phaseY, phaseSz,
-             isWork ? COL_GREEN : COL_BLUE);
+    RDrawText(phaseLabel, phaseX, phaseY, phaseSz, COL_GREEN);
 
     // Running indicator dot to the left of the label
-    Color dotCol = pomRunning ? (isWork ? COL_GREEN : COL_BLUE)
-                              : COL_DIM;
     if (pomRunning || (int)(GetTime() * 2) % 2 == 0)
-        DrawCircle(phaseX - 14, phaseY + phaseSz / 2, 4, dotCol);
+        DrawCircle(phaseX - 16, phaseY + phaseSz / 2, 4, pomRunning ? COL_GREEN : DIM_GREEN);
 
     // ---- COUNTDOWN TIMER ---------------------------------------------------
 
-    int   mins     = (int)pomTimeLeft / 60;
-    int   secs     = (int)pomTimeLeft % 60;
-    const char* timeStr  = TextFormat("%02d:%02d", mins, secs);
-    int   timerSz  = blockSize * 5;
-    int   timerW   = MeasureText(timeStr, timerSz);
-    int   timerY   = phaseY + phaseSz + 18;
+    int mins = (int)pomTimeLeft / 60;
+    int secs = (int)pomTimeLeft % 60;
+    const char *timeStr = TextFormat("%02d:%02d", mins, secs);
+    int timerSz = blockSize * 6;
+    int timerW = RMeasureText(timeStr, timerSz);
+    int timerY = phaseY + phaseSz + 20;
 
-    DrawText(timeStr, (windowWidth - timerW) / 2, timerY, timerSz, COL_BLUE);
+    RDrawText(timeStr, (windowWidth - timerW) / 2, timerY, timerSz, COL_GREEN);
 
     // ---- SESSION DOTS (one cycle = 4 work sessions) ------------------------
 
-    int dotY       = timerY + timerSz + 14;
-    int dotSpacing = 22;
-    int dotR       = 5;
+    int dotY = timerY + timerSz + 20;
+    int dotSpacing = 26;
+    int dotR = 6;
     int dotsStartX = windowWidth / 2 - dotSpacing * 2 + dotSpacing / 2;
 
     for (int i = 0; i < 4; i++)
     {
         int dotX = dotsStartX + i * dotSpacing;
         if (i < pomSessions % 4)
-            DrawCircle(dotX, dotY, dotR, COL_GREEN);
+            DrawCircle(dotX, dotY, (float)dotR, COL_GREEN);
         else
-            DrawCircleLines(dotX, dotY, (float)dotR, COL_DIM);
+            DrawCircleLines(dotX, dotY, (float)dotR, DIM_GREEN);
     }
 
     // ---- CONTROLS HINT -----------------------------------------------------
 
-    const char* ctrl   = pomRunning ? "SPACE  Pause    R  Reset    S  Settings"
-                                    : "SPACE  Start    R  Reset    S  Settings";
-    int         ctrlSz = blockSize - 6;
-    int         ctrlW  = MeasureText(ctrl, ctrlSz);
-    int         ctrlY  = dotY + 18;
+    const char *ctrl = pomRunning ? "SPACE PAUSE    R RESET    S SETTINGS"
+                                  : "SPACE START    R RESET    S SETTINGS";
+    int ctrlSz = blockSize - 4;
+    int ctrlW = RMeasureText(ctrl, ctrlSz);
+    int ctrlY = dotY + 26;
 
-    DrawText(ctrl, (windowWidth - ctrlW) / 2, ctrlY, ctrlSz, COL_DIM);
+    RDrawText(ctrl, (windowWidth - ctrlW) / 2, ctrlY, ctrlSz, DIM_GREEN);
 
-    // ---- SEPARATOR ---------------------------------------------------------
+    // ---- DOTTED SEPARATOR, square end-caps ---------------------------------
 
-    int sepY = ctrlY + ctrlSz + 20;
-    DrawRectangle(20, sepY, windowWidth - 40, 1, { 15, 177, 219, 50 });
+    int sepY = ctrlY + ctrlSz + 22;
+    int sepX0 = 20, sepX1 = windowWidth - 20;
 
-    // "LAUNCH" section label
-    DrawText("LAUNCH", 20, sepY + 8, blockSize - 4, { 15, 177, 219, 130 });
+    DrawRectangle(sepX0 - 3, sepY - 3, 6, 6, COL_GREEN);
+    DrawRectangle(sepX1 - 3, sepY - 3, 6, 6, COL_GREEN);
+    for (int x = sepX0 + 12; x < sepX1 - 12; x += 8)
+        DrawRectangle(x, sepY, 3, 1, COL_GREEN);
 
-    // ---- APP LIST ----------------------------------------------------------
+    // ---- APP LIST ------------------------------------------------------
 
-    int         appFontSz  = blockSize - 2;
-    int         appItemH   = appFontSz + 14;
-    int         appListY   = sepY + 34;
+    int appFontSz = blockSize;
+    int appItemH = appFontSz + 18;
+    int appListY = sepY + 26;
     vector<int> launchable = getLaunchableApps();
 
     for (int idx = 0; idx < (int)launchable.size(); idx++)
     {
-        int    appIndex = launchable[idx];
-        int    itemY    = appListY + idx * appItemH;
-        bool   selected = (appIndex == pom_selected_app);
+        int appIndex = launchable[idx];
+        int itemY = appListY + idx * appItemH;
+        bool selected = (appIndex == pom_selected_app);
 
         if (selected)
         {
-            // Highlight row
-            DrawRectangle(0, itemY - 4, windowWidth, appItemH,
-                          { 15, 177, 219, 35 });
-            // Accent bar on left
-            DrawRectangle(0, itemY - 4, 3, appItemH, COL_BLUE);
-            DrawText(appList[appIndex].displayName.c_str(),
-                     14, itemY, appFontSz, WHITE);
+            // Solid block-cursor highlight — text renders inverted (dark on
+            // bright green) to match the reference screenshot
+            DrawRectangle(sepX0, itemY - 6, sepX1 - sepX0, appItemH, COL_GREEN);
+
+            // Small pointer triangle to the left of the row
+            Vector2 p1 = {(float)(sepX0 - 14), (float)(itemY - 4)};
+            Vector2 p2 = {(float)(sepX0 - 14), (float)(itemY + appFontSz)};
+            Vector2 p3 = {(float)(sepX0 - 2), (float)(itemY + appFontSz / 2)};
+            DrawTriangle(p1, p2, p3, COL_GREEN);
+            // If your raylib build culls this backface and it doesn't show,
+            // just swap p1 and p2 to flip the winding order.
+
+            RDrawText(appList[appIndex].displayName.c_str(),
+                      sepX0 + 14, itemY, appFontSz, {6, 6, 10, 255});
         }
         else
         {
-            DrawText(appList[appIndex].displayName.c_str(),
-                     14, itemY, appFontSz, COL_DIM);
+            RDrawText(appList[appIndex].displayName.c_str(),
+                      sepX0 + 14, itemY, appFontSz, DIM_GREEN);
         }
     }
 
     // ---- BOTTOM HINT -------------------------------------------------------
 
-    const char* back  = "ESC  Back to buddy";
-    int         backSz = blockSize - 6;
-    int         backW  = MeasureText(back, backSz);
-    DrawText(back,
-             (windowWidth - backW) / 2,
-             windowHeight - blockSize * 2,
-             backSz, COL_DIM);
+    const char *back = ":: ESC BACK TO BUDDY ::";
+    int backSz = blockSize - 4;
+    int backW = RMeasureText(back, backSz);
+    RDrawText(back,
+              (windowWidth - backW) / 2,
+              windowHeight - blockSize * 2,
+              backSz, DIM_GREEN);
 
     // ---- SETTINGS OVERLAY --------------------------------------------------
 
     if (pomSettingsOpen)
     {
         // Dim pass over the rest of the UI
-        DrawRectangle(0, 0, windowWidth, windowHeight, { 0, 0, 0, 160 });
+        DrawRectangle(0, 0, windowWidth, windowHeight, {0, 0, 0, 180});
 
-        int panelW  = windowWidth  - 40;
-        int panelH  = 130;
-        int panelX  = 20;
-        int panelY  = (windowHeight - panelH) / 2;
+        int panelW = windowWidth - 40;
+        int panelH = 140;
+        int panelX = 20;
+        int panelY = (windowHeight - panelH) / 2;
 
-        // Panel: dark with a blue top accent
-        DrawRectangle(panelX, panelY, panelW, panelH, { 12, 12, 20, 245 });
-        DrawRectangle(panelX, panelY, panelW, 2, COL_BLUE);
-        DrawRectangleLinesEx({ (float)panelX, (float)panelY,
-                               (float)panelW, (float)panelH }, 1,
-                             { 15, 177, 219, 60 });
+        // Panel: solid black with a green frame, matching the main screen
+        DrawRectangle(panelX, panelY, panelW, panelH, {6, 6, 10, 255});
+        DrawRectangleLinesEx({(float)panelX, (float)panelY,
+                              (float)panelW, (float)panelH},
+                             2, COL_GREEN);
 
         // Title
-        int titleSz = blockSize;
-        DrawText("SETTINGS", panelX + 14, panelY + 12, titleSz, COL_BLUE);
+        int titleSz = blockSize + 2;
+        RDrawText(":: SETTINGS ::", panelX + 16, panelY + 14, titleSz, COL_GREEN);
 
         // Field labels and values
-        const char* labels[2]  = { "Work  (min)", "Break (min)" };
-        int         vals[2]    = { pomEditWork, pomEditBreak };
-        int         fieldStartY = panelY + titleSz + 24;
-        int         fieldH      = blockSize + 14;
-        int         valSz       = blockSize + 4;
+        const char *labels[2] = {"WORK  (MIN)", "BREAK (MIN)"};
+        int vals[2] = {pomEditWork, pomEditBreak};
+        int fieldStartY = panelY + titleSz + 28;
+        int fieldH = blockSize + 16;
+        int valSz = blockSize + 4;
 
         for (int f = 0; f < 2; f++)
         {
-            int fy      = fieldStartY + f * fieldH;
+            int fy = fieldStartY + f * fieldH;
             bool active = (pomSettingsField == f);
-            Color fg    = active ? WHITE : COL_DIM;
+            Color fg = active ? COL_GREEN : DIM_GREEN;
 
             // Highlight active row
             if (active)
                 DrawRectangle(panelX, fy - 4, panelW, fieldH,
-                              { 15, 177, 219, 25 });
+                              {15, 219, 60, 30});
 
-            DrawText(labels[f], panelX + 14, fy, blockSize - 2, fg);
+            RDrawText(labels[f], panelX + 16, fy, blockSize - 2, fg);
 
             // Value with arrows
-            const char* valStr = TextFormat("%d", vals[f]);
-            int valW = MeasureText(valStr, valSz);
-            int valX = panelX + panelW - 14 - valW;
+            const char *valStr = TextFormat("%d", vals[f]);
+            int valW = RMeasureText(valStr, valSz);
+            int valX = panelX + panelW - 16 - valW;
 
             if (active)
             {
-                DrawText("<", valX - 18, fy - 1, valSz, COL_BLUE);
-                DrawText(">", valX + valW + 6, fy - 1, valSz, COL_BLUE);
+                RDrawText("<", valX - 20, fy - 1, valSz, COL_GREEN);
+                RDrawText(">", valX + valW + 8, fy - 1, valSz, COL_GREEN);
             }
 
-            DrawText(valStr, valX, fy - 1, valSz, active ? COL_BLUE : COL_DIM);
+            RDrawText(valStr, valX, fy - 1, valSz, fg);
         }
 
         // Bottom hints
-        int hintY  = panelY + panelH - blockSize - 8;
-        int hintSz = blockSize - 6;
-        DrawText("ENTER  Apply    ESC  Cancel",
-                 panelX + 14, hintY, hintSz, { 80, 80, 80, 200 });
+        int hintY = panelY + panelH - blockSize - 10;
+        int hintSz = blockSize - 4;
+        RDrawText(":: ENTER APPLY   ESC CANCEL ::",
+                  panelX + 16, hintY, hintSz, DIM_GREEN);
     }
 }

@@ -1,21 +1,53 @@
 #include "desktop_buddy.h"
 #include "pomodoro.h"
 #include <algorithm>
+#include <cmath>
 
 using std::max;
 using std::min;
 
 // ---------------------------------------------------------------------------
 // Helper — resize window keeping its screen-space center fixed
+//
+// The actual SetWindowSize/SetWindowPosition calls are DEFERRED until after
+// the current frame has been drawn and presented (see applyPendingBuddyResize,
+// called from run() after EndDrawing()). Resizing mid-frame — before the new
+// frame's content is drawn — causes the OS/compositor to briefly repaint the
+// newly-resized window with the STALE previous frame's pixels clipped into
+// the new bounds, which shows up as a flash of leftover game/app content
+// during shrink transitions.
 // ---------------------------------------------------------------------------
+
+static bool resizePending = false;
+static int  pendingX = 0, pendingY = 0;
+static int  pendingW = 0, pendingH = 0;
+
+/// Generic entry point: any caller can request a deferred window resize/move.
+void requestBuddyWindowResize(int x, int y, int w, int h)
+{
+    pendingX      = x;
+    pendingY      = y;
+    pendingW      = w;
+    pendingH      = h;
+    resizePending = true;
+}
 
 static void resizeFromCenter(float w, float h)
 {
     current_win_w = w;
     current_win_h = h;
-    SetWindowPosition((int)(window_center_x - w / 2.0f),
-                      (int)(window_center_y - h / 2.0f));
-    SetWindowSize((int)w, (int)h);
+
+    requestBuddyWindowResize((int)(window_center_x - w / 2.0f),
+                              (int)(window_center_y - h / 2.0f),
+                              (int)w, (int)h);
+}
+
+void applyPendingBuddyResize()
+{
+    if (!resizePending) return;
+    resizePending = false;
+    SetWindowPosition(pendingX, pendingY);
+    SetWindowSize(pendingW, pendingH);
 }
 
 // ---------------------------------------------------------------------------
@@ -77,10 +109,21 @@ static void startLaunchTransition(int appIndex)
 
 void initDesktopBuddy()
 {
-    buddy_window_w = standing_sprite_w / 3.0f;
-    buddy_window_h = standing_sprite_h / 3.0f;
+    buddy_window_w = IDLE_FRAME_SIZE * BUDDY_DISPLAY_SCALE;
+    buddy_window_h = IDLE_FRAME_SIZE * BUDDY_DISPLAY_SCALE;
     current_win_w  = buddy_window_w;
     current_win_h  = buddy_window_h;
+
+    // First blink happens after a random short delay
+    blink_cooldown_timer = (float)GetRandomValue(BLINK_COOLDOWN_MIN, BLINK_COOLDOWN_MAX);
+
+    retroShader                = LoadShader(0, "retro.fs");
+    retroShader_timeLoc        = GetShaderLocation(retroShader, "time");
+    retroShader_frameBoundsLoc = GetShaderLocation(retroShader, "frameBounds");
+
+    outlineShader                = LoadShader(0, "outline.fs");
+    outlineShader_frameBoundsLoc = GetShaderLocation(outlineShader, "frameBounds");
+    outlineShader_colorLoc       = GetShaderLocation(outlineShader, "glowColor");
 }
 
 // ---------------------------------------------------------------------------
@@ -134,10 +177,12 @@ void updateDesktopBuddy()
             tv_on           = false;
             buddy_standing  = true;
             buddy_attacking = false;
+            buddy_blinking  = false;
             current_frame   = 0;
             attacking_src   = { 80, 350, ATTACK_WIDTH, ATTACK_HEIGHT };
-            standing_src    = { standing_sprite_x, standing_sprite_y,
-                                standing_sprite_w, standing_sprite_h };
+            idle_src        = { 0.0f, 0.0f, (float)IDLE_FRAME_SIZE, (float)IDLE_FRAME_SIZE };
+            blink_src       = { 0.0f, 0.0f, (float)BLINK_FRAME_SIZE, (float)BLINK_FRAME_SIZE };
+            blink_cooldown_timer = (float)GetRandomValue(BLINK_COOLDOWN_MIN, BLINK_COOLDOWN_MAX);
         }
         return;
     }
@@ -274,19 +319,52 @@ void updateDesktopBuddy()
         return;
     }
 
-    // Idle animation
-    if (buddy_standing && buddyAnimInterval.checkInterval(0.1f))
+    // -----------------------------------------------------------------------
+    // Idle / Blink state machine
+    // -----------------------------------------------------------------------
+    if (buddy_standing)
     {
-        standing_src.x += standing_frame_w + standing_gap_x;
-        current_frame++;
-
-        if (standing_src.x >= (float)standing_texture.width)
+        if (!buddy_blinking)
         {
-            standing_src.x = standing_sprite_x;
-            current_frame  = 0;
-            float nextRow  = standing_src.y + standing_frame_h + standing_gap_y;
-            standing_src.y = (nextRow + standing_frame_h <= (float)standing_texture.height)
-                             ? nextRow : standing_sprite_y;
+            // Slow idle loop (roboIdle.png — 3 frames)
+            if (buddyAnimInterval.checkInterval(IDLE_FRAME_TIME))
+            {
+                current_frame = (current_frame + 1) % IDLE_TOTAL_FRAMES;
+                idle_src.x    = (float)(current_frame * IDLE_FRAME_SIZE);
+            }
+
+            // Count down to the next blink
+            blink_cooldown_timer -= GetFrameTime();
+            if (blink_cooldown_timer <= 0.0f)
+            {
+                buddy_blinking    = true;
+                blink_cycles_done = 0;
+                current_frame     = 0;
+                blink_src.x       = 0.0f;
+            }
+        }
+        else
+        {
+            // Fast blink loop (roboBlink.png — 7 frames), played twice in a row
+            if (blinkAnimInterval.checkInterval(BLINK_FRAME_TIME))
+            {
+                current_frame++;
+                blink_src.x = (float)(current_frame * BLINK_FRAME_SIZE);
+
+                if (current_frame >= BLINK_TOTAL_FRAMES)
+                {
+                    current_frame = 0;
+                    blink_src.x   = 0.0f;
+                    blink_cycles_done++;
+
+                    if (blink_cycles_done >= BLINK_REPEAT_COUNT)
+                    {
+                        buddy_blinking        = false;
+                        current_frame         = 0;
+                        blink_cooldown_timer  = (float)GetRandomValue(BLINK_COOLDOWN_MIN, BLINK_COOLDOWN_MAX);
+                    }
+                }
+            }
         }
     }
 }
@@ -320,13 +398,13 @@ void drawDesktopBuddy()
         // Small phase tag on the left
         const char* tag   = work ? "W " : "B ";
         int         tagSz = 11;
-        DrawText(tag, 0, (int)((TIMER_BAR_H - tagSz) / 2.0f), tagSz, accent);
+        RDrawText(tag, 0, (int)((TIMER_BAR_H - tagSz) / 2.0f), tagSz, accent);
 
         // Time centred, larger
         const char* timeStr = TextFormat("%02d:%02d", mins, secs);
         int         timeSz  = 17;
-        int         timeW   = MeasureText(timeStr, timeSz);
-        DrawText(timeStr,
+        int         timeW   = RMeasureText(timeStr, timeSz);
+        RDrawText(timeStr,
                  ((int)buddy_window_w - timeW) / 2,
                  (int)((TIMER_BAR_H - timeSz) / 2.0f),
                  timeSz, accent);
@@ -335,27 +413,63 @@ void drawDesktopBuddy()
     // Vertical offset for sprite: push down if timer bar is showing
     float spriteOffsetY = pomFloatingTimer ? TIMER_BAR_H : 0.0f;
 
-    // ---- Focus radial glow (drawn behind sprite) ---------------------------
-    if (buddy_focused)
-    {
-        float cx = buddy_window_w / 2.0f;
-        float cy = spriteOffsetY + buddy_window_h / 2.0f;
-        float r  = buddy_window_w * 0.72f;
-
-        // Layered transparent circles — subtle halo effect
-        DrawCircle((int)cx, (int)cy, r * 1.00f, { 15, 177, 219,  18 });
-        DrawCircle((int)cx, (int)cy, r * 0.75f, { 15, 177, 219,  22 });
-        DrawCircle((int)cx, (int)cy, r * 0.50f, { 15, 177, 219,  18 });
-        DrawCircle((int)cx, (int)cy, r * 0.28f, { 15, 177, 219,  12 });
-    }
-
-    // ---- Buddy sprite ------------------------------------------------------
+    // ---- Buddy sprite (idle / blink / attack), retro-shaded ----------------
     if (buddy_standing || buddy_attacking)
     {
-        Texture2D& tex  = buddy_standing ? standing_texture  : attacking_texture;
-        Rectangle& src  = buddy_standing ? standing_src      : attacking_src;
-        Rectangle   dst = { 0, spriteOffsetY, buddy_window_w, buddy_window_h };
-        DrawTexturePro(tex, src, dst, { 0, 0 }, 0.0f, WHITE);
-    }
+        Texture2D& tex = buddy_attacking ? attacking_texture
+                        : buddy_blinking ? blink_texture
+                                         : idle_texture;
+        Rectangle& src = buddy_attacking ? attacking_src
+                        : buddy_blinking ? blink_src
+                                         : idle_src;
+        Rectangle dst = { 0, spriteOffsetY, buddy_window_w, buddy_window_h };
 
+        // Frame bounds (u0,v0,u1,v1) — keeps the shaders' UV sampling from
+        // bleeding into neighbouring frames on the sheet.
+        float u0 = src.x / (float)tex.width;
+        float v0 = src.y / (float)tex.height;
+        float u1 = (src.x + src.width)  / (float)tex.width;
+        float v1 = (src.y + src.height) / (float)tex.height;
+        float frameBounds[4] = { u0, v0, u1, v1 };
+
+        // ---- Focus outline glow (traces the sprite's silhouette) -----------
+        // Stamps the sprite's alpha shape, recoloured flat, at several
+        // offsets around the real position — builds a soft glowing outline
+        // instead of a generic circular halo.
+        if (buddy_focused)
+        {
+            float pulse     = 0.5f + 0.5f * sinf((float)GetTime() * 3.0f);  // slow breathing
+            float glowAlpha = 0.30f + 0.35f * pulse;                        // 0.30 .. 0.65
+            float col[4]    = { 15 / 255.0f, 177 / 255.0f, 219 / 255.0f, glowAlpha };
+
+            SetShaderValue(outlineShader, outlineShader_frameBoundsLoc, frameBounds, SHADER_UNIFORM_VEC4);
+            SetShaderValue(outlineShader, outlineShader_colorLoc,       col,         SHADER_UNIFORM_VEC4);
+
+            BeginShaderMode(outlineShader);
+                const int   ringSteps = 12;   // more steps = smoother ring
+                const float thickness = 3.0f; // px — how far the glow reaches past the sprite edge
+                for (int i = 0; i < ringSteps; i++)
+                {
+                    float ang = (2.0f * PI * i) / ringSteps;
+                    Rectangle odst = dst;
+                    odst.x += cosf(ang) * thickness;
+                    odst.y += sinf(ang) * thickness;
+                    DrawTexturePro(tex, src, odst, { 0, 0 }, 0.0f, WHITE);
+                }
+            EndShaderMode();
+        }
+
+        // ---- Normal retro-shaded sprite on top ------------------------------
+        SetShaderValue(retroShader, retroShader_frameBoundsLoc, frameBounds, SHADER_UNIFORM_VEC4);
+
+        // Real elapsed time — deliberately NOT derived from buddyAnimInterval
+        // or blinkAnimInterval, so the shader's wave/glitch animate smoothly
+        // on their own clock no matter how fast idle vs. blink is stepping.
+        float t = (float)GetTime();
+        SetShaderValue(retroShader, retroShader_timeLoc, &t, SHADER_UNIFORM_FLOAT);
+
+        BeginShaderMode(retroShader);
+        DrawTexturePro(tex, src, dst, { 0, 0 }, 0.0f, WHITE);
+        EndShaderMode();
+    }
 }
