@@ -18,17 +18,6 @@ uniform float     curvature;      // 0 = flat, higher = more barrel bulge
 uniform vec4  borderColor;
 uniform float borderThickness;  // px, how wide the visible ring is
 
-// Set true for screens (Pomodoro) that always paint a fully opaque
-// background before anything else. On those screens we skip scene.a
-// entirely — raylib's default blend applies the same formula to the alpha
-// channel as it does to color, so anti-aliased glyph edges (partial-coverage
-// pixels baked into the font atlas) end up with alpha slightly under 1.0
-// even over an opaque background. On a normal window that's invisible; on
-// this app's real OS-transparent window it lets the desktop show through
-// right around text edges. Forcing alpha to 1.0 here sidesteps that instead
-// of fighting the blend math per draw call.
-uniform bool  forceOpaque;
-
 out vec4 finalColor;
 
 // Signed distance to a rounded rectangle, centered at origin, half-size b, corner radius r
@@ -104,7 +93,7 @@ float outerMask = smoothstep(0.0, 1.5, -outerD);
 // scene.a fixes that, and it's also what removes Pomodoro's old forced
 // black bezel band: Pomodoro already paints its own opaque background, so
 // it stays opaque here with no separate frame needed.
-float alpha = forceOpaque ? outerMask : (scene.a * outerMask);
+float alpha = scene.a * outerMask;
 
 
     // ---- 9) Colored accent border ring, right along the outer edge --------

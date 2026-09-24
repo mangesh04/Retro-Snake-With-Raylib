@@ -14,10 +14,12 @@ constexpr bool USE_ATTACK_ANIMATION = false;
 // Shared accent colours (used by buddy, pomodoro, and menu)
 // ---------------------------------------------------------------------------
 
-inline const Color COL_BLUE  = {  15, 177, 219, 255 };  // #0fb1db
-inline const Color COL_GREEN = { 135, 241,  97, 255 };  // #87f161
-inline const Color COL_DIM   = {  80,  80,  80, 255 };
-inline const Color COL_BG    = {   8,   8,   8, 225 };  // panel background
+
+inline Color COL_BLUE  = {  15, 177, 219, 255 };  // #0fb1db
+inline Color COL_GREEN = { 135, 241,  97, 255 };  // #87f161
+inline Color COL_DIM   = {  80,  80,  80, 255 };
+inline Color COL_BG    = {   8,   8,   8, 225 };  // panel background
+
 
 // Phosphor-green tint applied directly to the buddy sprite. The buddy now
 // bypasses the whole-window CRT composite pass entirely (see run() in
@@ -187,3 +189,4 @@ void drawDesktopBuddy();
 void startBuddyReturn();
 void applyPendingBuddyResize();
 void requestBuddyWindowResize(int x, int y, int w, int h);
+void applyTheme(Theme t);

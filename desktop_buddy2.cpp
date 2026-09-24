@@ -12,18 +12,11 @@ void applyTheme(Theme t)
     currentTheme = t;
     if (t == Theme::NORMAL)
     {
-        // pulled straight from the buddy sprite's own pixels, instead of a
-        // generic palette unrelated to it
-
-        // COL_BLUE = {0, 209, 247, 255};   // #00D1F7 — bright cyan, main sprite color
-        // COL_GREEN = {140, 227, 43, 255}; // #8CE32B — lime accent
-        // COL_DIM = {19, 50, 55, 255};     // #133237 — dark teal shadow tone
-        // COL_BG = {21, 21, 21, 235};      // #151515 — matches sprite's own backdrop
-
-        COL_BLUE = {0, 209, 247, 255};   // #00D1F7 — bright cyan, main sprite color
-        COL_GREEN = {140, 227, 43, 255}; // #8CE32B — lime accent
-        COL_DIM = {19, 50, 55, 255};     // #133237 — dark teal shadow tone
-        COL_BG = {21, 21, 21, 235};      // #151515 — matches sprite's own backdrop
+        // flat, non-neon palette
+        COL_BLUE = {86, 140, 255, 255};
+        COL_GREEN = {250, 176, 60, 255};
+        COL_DIM = {110, 110, 120, 255};
+        COL_BG = {24, 24, 30, 235};
     }
     else
     {
@@ -203,10 +196,8 @@ void updateDesktopBuddy()
 
     if (tv_on)
     {
-        // Grow window back to buddy size. The floating timer (if any) is
-        // drawn directly over the sprite now, so it no longer needs extra
-        // window height reserved for it.
-        float targetH = buddy_window_h;
+        // Grow window back to buddy size — height accounts for floating timer bar
+        float targetH = buddy_window_h + (pomFloatingTimer ? TIMER_BAR_H : 0.0f);
         float newW = min(buddy_window_w, current_win_w + SHRINK_SPEED_W);
         float newH = min(targetH, current_win_h + SHRINK_SPEED_H);
         resizeFromCenter(newW, newH);
@@ -429,6 +420,35 @@ void drawDesktopBuddy()
 
     ClearBackground(BLANK);
 
+    // ---- Floating timer bar above the buddy --------------------------------
+    if (pomFloatingTimer)
+    {
+        DrawRectangle(0, 0, (int)buddy_window_w, (int)TIMER_BAR_H, {6, 6, 10, 230});
+        DrawRectangle(0, (int)TIMER_BAR_H - 1, (int)buddy_window_w, 1, COL_BLUE);
+
+        int mins = (int)pomTimeLeft / 60;
+        int secs = (int)pomTimeLeft % 60;
+        bool work = (pomPhase == PomodoroPhase::WORK);
+        Color accent = work ? COL_BLUE : COL_GREEN;
+
+        // Small phase tag on the left
+        const char *tag = work ? "W " : "B ";
+        int tagSz = 11;
+        RDrawText(tag, 0, (int)((TIMER_BAR_H - tagSz) / 2.0f), tagSz, accent);
+
+        // Time centred, larger
+        const char *timeStr = TextFormat("%02d:%02d", mins, secs);
+        int timeSz = 17;
+        int timeW = RMeasureText(timeStr, timeSz);
+        RDrawText(timeStr,
+                  ((int)buddy_window_w - timeW) / 2,
+                  (int)((TIMER_BAR_H - timeSz) / 2.0f),
+                  timeSz, accent);
+    }
+
+    // Vertical offset for sprite: push down if timer bar is showing
+    float spriteOffsetY = pomFloatingTimer ? TIMER_BAR_H : 0.0f;
+
     // ---- Buddy sprite (idle / blink / attack), retro-shaded ----------------
     if (buddy_standing || buddy_attacking)
     {
@@ -438,7 +458,7 @@ void drawDesktopBuddy()
         Rectangle &src = buddy_attacking  ? attacking_src
                          : buddy_blinking ? blink_src
                                           : idle_src;
-        Rectangle dst = {0, 0, buddy_window_w, buddy_window_h};
+        Rectangle dst = {0, spriteOffsetY, buddy_window_w, buddy_window_h};
 
         // Frame bounds (u0,v0,u1,v1) — keeps the shaders' UV sampling from
         // bleeding into neighbouring frames on the sheet.
@@ -489,22 +509,5 @@ void drawDesktopBuddy()
         {
             DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, WHITE);
         }
-    }
-
-    // ---- Floating timer — plain text over the sprite, no box/window -------
-    if (pomFloatingTimer)
-    {
-        int mins = (int)pomTimeLeft / 60;
-        int secs = (int)pomTimeLeft % 60;
-        bool work = (pomPhase == PomodoroPhase::WORK);
-        Color accent = work ? COL_BLUE : COL_GREEN;
-
-        // "W : 20:20" / "B : 04:59" — label and time as one string
-        const char *label = work ? "W" : "B";
-        const char *str = TextFormat("%s : %02d:%02d", label, mins, secs);
-
-        int sz = 30;
-        int w = RMeasureText(str, sz);
-        RDrawText(str, ((int)buddy_window_w - w) / 2, 0, sz, accent);
     }
 }

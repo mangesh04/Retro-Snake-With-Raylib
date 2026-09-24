@@ -1,5 +1,6 @@
 #pragma once
 #include <raylib.h>
+#include <vector>
 #include "utils.h"
 #include "apps.h"
 
@@ -39,6 +40,7 @@ inline int  pomSettingsField  = 0;       ///< 0 = work minutes, 1 = break minute
 inline int  pomEditWork       = 25;      ///< In-progress edit value for work
 inline int  pomEditBreak      = 5;       ///< In-progress edit value for break
 inline bool pomEscConsumed    = false;   ///< Set true when pomodoro eats an ESC (settings close)
+inline int  pomEditTheme      = 1;       ///< 0 = Normal, 1 = Retro (mirrors Theme enum)
 
 // ---------------------------------------------------------------------------
 // Glass grain texture (generated once at first draw)
@@ -59,5 +61,18 @@ void updatePomodoroTime();
 /// Full update: time + input handling — call only when Pomodoro is the active app
 void updatePomodoro();
 
-/// Draws the Pomodoro screen
+/// Draws the Pomodoro screen — picks the Retro or Normal renderer based on
+/// currentTheme (see pomodoro.cpp for the dispatch, pomodoro_retro.cpp /
+/// pomodoro_normal.cpp for the actual drawing code of each theme).
 void drawPomodoro();
+
+/// Theme-specific renderers. Only drawPomodoro() above should be called from
+/// outside the Pomodoro files, but these are declared here so both theme
+/// files can be compiled independently and the dispatcher can reach both.
+void drawPomodoroRetro();
+void drawPomodoroNormal();
+
+/// Shared helper — every app in appList except the Pomodoro app itself, in
+/// list order. Used by both input handling (pomodoro.cpp) and by whichever
+/// theme file is drawing the launch list.
+std::vector<int> getLaunchableApps();

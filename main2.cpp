@@ -6,11 +6,6 @@
 #include "pong.h"
 #include "breakout.h"
 #include "listener.h"
-#include "music_player.h"
-
-// Defined here (not in a header) since eatSound/wallSound's header wasn't
-// available to edit. pomodoro.cpp reaches this via `extern Sound breakSound;`.
-Sound breakSound = {0};
 
 // ---------------------------------------------------------------------------
 // CRT post-process pipeline
@@ -27,10 +22,6 @@ Sound breakSound = {0};
 // This sits ENTIRELY in main.cpp / run(); no other file needs to know it
 // exists. The buddy's own glitch shader (retro.fs) still runs exactly as
 // before, nested inside the normal draw() call in pass 1.
-//
-// Theme::NORMAL skips all of the above (no bloom, no CRT look) but still
-// gets a lightweight rounded-corner-only pass via roundedMask.fs, so its
-// window reads as a soft rounded rectangle instead of a hard-edged rect.
 // ---------------------------------------------------------------------------
 
 static RenderTexture2D sceneRT, brightRT, blurHRT, blurVRT;
@@ -46,11 +37,8 @@ static int compBloomTexLoc, compResLoc, compTimeLoc, compTintLoc,
     compBezelLoc, compCornerLoc, compCurveLoc,
     compBorderColorLoc, compBorderThickLoc;
 
-static int compForceOpaqueLoc;
-
-// Lightweight rounded-corner-only pass, used exclusively by Theme::NORMAL.
-static Shader roundedMaskShader;
-static int rmResLoc, rmCornerLoc, rmForceOpaqueLoc;
+   
+static int compForceOpaqueLoc; // ADD THIS LINE
 
 static void ensureRenderTargets(int w, int h)
 {
@@ -91,8 +79,12 @@ static void initPostProcess()
     compCurveLoc = GetShaderLocation(compositeShader, "curvature");
 
     compBorderColorLoc = GetShaderLocation(compositeShader, "borderColor");
+
+    compBorderColorLoc = GetShaderLocation(compositeShader, "borderColor");
     compBorderThickLoc = GetShaderLocation(compositeShader, "borderThickness");
-    compForceOpaqueLoc = GetShaderLocation(compositeShader, "forceOpaque");
+    compForceOpaqueLoc = GetShaderLocation(compositeShader, "forceOpaque"); // ADD THIS LINE
+
+    compBorderThickLoc = GetShaderLocation(compositeShader, "borderThickness");
 
     // If this fires, composite.fs on disk doesn't actually declare these
     // uniforms (stale/mismatched file) — the transparency toggle below will
@@ -103,12 +95,6 @@ static void initPostProcess()
 
     float threshold = 0.45f;
     SetShaderValue(brightPassShader, brightThresholdLoc, &threshold, SHADER_UNIFORM_FLOAT);
-
-    // Normal theme's rounded-corner-only pass — no CRT effects at all.
-    roundedMaskShader = LoadShader(0, "roundedMask.fs");
-    rmResLoc = GetShaderLocation(roundedMaskShader, "resolution");
-    rmCornerLoc = GetShaderLocation(roundedMaskShader, "cornerRadius");
-    rmForceOpaqueLoc = GetShaderLocation(roundedMaskShader, "forceOpaque");
 }
 
 static void closePostProcess()
@@ -123,7 +109,6 @@ static void closePostProcess()
     UnloadShader(brightPassShader);
     UnloadShader(blurShader);
     UnloadShader(compositeShader);
-    UnloadShader(roundedMaskShader);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +133,6 @@ void initializeWindow()
     InitAudioDevice();
     eatSound = LoadSound("Sounds/Sounds_eat.mp3");
     wallSound = LoadSound("Sounds/Sounds_wall.mp3");
-    breakSound = LoadSound("Sounds/break.mp3"); // played when Pomodoro hits BREAK
 
     // Load at a decent base size and keep point-filtering so it stays crisp
     // (no blurry upscaling) — matches the blocky terminal look.
@@ -169,8 +153,6 @@ void closeWindow()
     UnloadFont(retroFont);
     UnloadSound(eatSound);
     UnloadSound(wallSound);
-    UnloadSound(breakSound);
-    closeMusicPlayer(); // before the audio device goes away
     CloseAudioDevice();
     CloseWindow();
 }
@@ -181,10 +163,6 @@ void closeWindow()
 
 void update()
 {
-    // Music lives outside every app - keep it streaming whether the buddy,
-    // Pomodoro, a game or the Music Player itself is on screen.
-    updateMusicPlayerAudio();
-
     // Always keep the Pomodoro timer counting in background when floating
     if (pomFloatingTimer)
         updatePomodoroTime();
@@ -192,9 +170,21 @@ void update()
     if (desktop_buddy_active)
     {
         updateDesktopBuddy();
-        // The floating timer now draws directly over the buddy sprite
-        // (see drawDesktopBuddy()) instead of adding a bar above it, so the
-        // window no longer needs to resize when pomFloatingTimer toggles.
+
+        // Resize buddy window when floating timer state changes
+        static bool lastFloatingState = false;
+        if (pomFloatingTimer != lastFloatingState)
+        {
+            float targetH = buddy_window_h + (pomFloatingTimer ? TIMER_BAR_H : 0.0f);
+            Vector2 pos = GetWindowPosition();
+            int newY = (int)(pomFloatingTimer ? (pos.y - TIMER_BAR_H) : (pos.y + TIMER_BAR_H));
+
+            requestBuddyWindowResize((int)pos.x, newY, (int)buddy_window_w, (int)targetH);
+
+            current_win_w = buddy_window_w;
+            current_win_h = targetH;
+        }
+        lastFloatingState = pomFloatingTimer;
         return;
     }
 
@@ -210,8 +200,6 @@ void update()
         updatePong();
     if (type == AppType::INTERNAL_BREAKOUT)
         updateBreakout();
-    if (type == AppType::INTERNAL_MUSIC)
-        updateMusicPlayerApp();
 
     // ESC during any running app — only if not already consumed by the app
     if (IsKeyPressed(KEY_ESCAPE) && !pomEscConsumed)
@@ -238,7 +226,6 @@ void update()
         {
             resetBreakout();
         }
-        // INTERNAL_MUSIC: nothing to reset - playback continues in the background
 
         startBuddyReturn();
     }
@@ -265,8 +252,6 @@ void draw()
         drawPong();
     if (type == AppType::INTERNAL_BREAKOUT)
         drawBreakout();
-    if (type == AppType::INTERNAL_MUSIC)
-        drawMusicPlayerApp();
 }
 
 // ---------------------------------------------------------------------------
@@ -288,32 +273,11 @@ void run()
         draw();
         EndTextureMode();
 
-        // Only Pomodoro gets the opaque black panel + colored border ring.
-        // Buddy stays truly transparent wherever nothing was drawn; Snake,
-        // Pong, and Breakout also render full-bleed with no forced frame.
-        // Declared here so both the Normal and Retro branches below can use it.
-        bool isPomodoro = !desktop_buddy_active &&
-                          (appList[pending_app_index].type == AppType::INTERNAL_POMODORO ||
-                           appList[pending_app_index].type == AppType::INTERNAL_MUSIC); // opaque panel + accent ring
-
         if (currentTheme == Theme::NORMAL)
         {
-            // Lightweight pass: rounded corners only, no bloom/scanlines/
-            // curvature/grain — those are Retro-only (composite.fs below).
-            Vector2 res = {(float)w, (float)h};
-            SetShaderValue(roundedMaskShader, rmResLoc, &res, SHADER_UNIFORM_VEC2);
-
-            float corner = 18.0f; // same radius as Retro's bezel, for visual consistency
-            SetShaderValue(roundedMaskShader, rmCornerLoc, &corner, SHADER_UNIFORM_FLOAT);
-
-            int forceOpaque = isPomodoro ? 1 : 0;
-            SetShaderValue(roundedMaskShader, rmForceOpaqueLoc, &forceOpaque, SHADER_UNIFORM_INT);
-
             BeginDrawing();
             ClearBackground(BLANK);
-            BeginShaderMode(roundedMaskShader);
             DrawTextureRec(sceneRT.texture, {0, 0, (float)w, -(float)h}, {0, 0}, WHITE);
-            EndShaderMode();
             EndDrawing();
             applyPendingBuddyResize();
             continue; // skip the bloom/composite passes below entirely
@@ -365,6 +329,11 @@ void run()
         SetShaderValue(compositeShader, compBezelLoc, &bezel, SHADER_UNIFORM_FLOAT);
         SetShaderValue(compositeShader, compCornerLoc, &corner, SHADER_UNIFORM_FLOAT);
         SetShaderValue(compositeShader, compCurveLoc, &curvature, SHADER_UNIFORM_FLOAT);
+
+        // Only Pomodoro gets the opaque black CRT bezel + colored border ring.
+        // Buddy stays truly transparent wherever nothing was drawn; Snake,
+        // Pong, and Breakout also render full-bleed with no forced frame.
+        bool isPomodoro = !desktop_buddy_active && appList[pending_app_index].type == AppType::INTERNAL_POMODORO;
 
         int forceOpaque = isPomodoro ? 1 : 0;
         SetShaderValue(compositeShader, compForceOpaqueLoc, &forceOpaque, SHADER_UNIFORM_INT);

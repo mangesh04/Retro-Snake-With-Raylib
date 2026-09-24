@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+// in appList, next to your Pong/Breakout entries (same fields as those):
+
 // ---------------------------------------------------------------------------
 // App types
 // INTERNAL_SNAKE    — built-in snake game (takes over the window)
@@ -15,8 +17,16 @@ enum class AppType
     INTERNAL_POMODORO,
     INTERNAL_PONG,
     INTERNAL_BREAKOUT,
-    EXTERNAL
+    EXTERNAL,
+    INTERNAL_MUSIC,
 };
+
+enum class Theme
+{
+    NORMAL,
+    RETRO
+};
+inline Theme currentTheme = Theme::RETRO;
 
 struct App
 {
@@ -36,10 +46,10 @@ struct App
 
 inline std::vector<App> appList =
     {
+        {"music", AppType::INTERNAL_MUSIC, "MUSIC"},
         {"Retro Snake", AppType::INTERNAL_SNAKE, ""},
         {"Pomodoro Timer", AppType::INTERNAL_POMODORO, ""},
 
         {"Pong", AppType::INTERNAL_PONG, ""},
-        {"Breakout",AppType::INTERNAL_BREAKOUT, ""},
-        // { "Notepad",     AppType::EXTERNAL, "notepad.exe" },
+        {"Breakout", AppType::INTERNAL_BREAKOUT, ""},
 };
